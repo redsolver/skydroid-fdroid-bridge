@@ -27,7 +27,7 @@ main(List<String> args) async {
 
   List<Map> records = [];
   var collection = StringBuffer('''title: F-Droid Collection
-description: Contains latest apps bridged from F-Droid.
+description: Contains the latest apps bridged from F-Droid.
 icon: https://f-droid.org/repo/icons-640/org.fdroid.fdroid.1010000.png
 
 apps:

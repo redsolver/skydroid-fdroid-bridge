@@ -8,7 +8,7 @@ It is part of my submission to the [‘Own The Internet’ Hackathon](https://gi
 
 ## How to use with SkyDroid
 
-Add the `papagei`-collection in the SkyDroid App. (Migrating to `fdroid-app` soon)
+Add the `fdroid-app`-collection in the SkyDroid App.
 
 ## How to run this bridge
 
