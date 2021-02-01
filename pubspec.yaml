@@ -2,7 +2,6 @@ name: skydroid_fdroid_bridge
 description: Makes F-Droid apps available via SkyDroid.
 # version: 1.0.0
 # homepage: https://www.example.com
-
 environment:
   sdk: ">=2.8.1 <3.0.0"
 
@@ -13,6 +12,9 @@ dependencies:
   http: ^0.12.2
   crypto: ^2.1.5
   dotenv: ^2.0.0
+  skynet:
+    path: ../skynet
+  path: ^1.7.0
 
 dev_dependencies:
   pedantic: ^1.9.0

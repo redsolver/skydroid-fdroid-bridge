@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 
 import 'package:dotenv/dotenv.dart' as dotenv;
+import 'package:path/path.dart';
+import 'package:skynet/skynet.dart';
 
 main(List<String> args) async {
   dotenv.load();
@@ -26,6 +28,27 @@ main(List<String> args) async {
   /* return; */
 
   List<Map> records = [];
+
+  void setRecords() async {
+    print(records);
+
+    var res = await http.put(
+      'https://www.namebase.io/api/v0/dns/domains/$bridgeDomain/nameserver',
+      headers: {
+        'Authorization': authHeader,
+        'content-type': 'application/json'
+      },
+      body: json.encode(
+        {
+          'records': records,
+          'deleteRecords': [],
+        },
+      ),
+    );
+    print(res.statusCode);
+    print(res.body);
+  }
+
   var collection = StringBuffer('''title: F-Droid Collection
 description: Contains the latest apps bridged from F-Droid.
 icon: https://f-droid.org/repo/icons-640/org.fdroid.fdroid.1010000.png
@@ -33,19 +56,31 @@ icon: https://f-droid.org/repo/icons-640/org.fdroid.fdroid.1010000.png
 apps:
 ''');
 
+  File('data/existing-records.json')
+      .writeAsStringSync(json.encode(existingRecords));
+
+  int i = 0;
+
   for (File file in Directory('data/out').listSync()) {
     final Map data = json.decode(file.readAsStringSync());
-    if (data['lastUpdated'] > 1593554400000) {
+
+    final bool updatedRecently =
+        data['lastUpdated'] > 1603050400000; //1565550400000;
+
+    if (data['lastUpdated'] > 0 /* 1350550400000 */) {
+      i++;
       final hash = sha256.convert(file.readAsBytesSync()).toString();
 
       String packageName = data['packageName'].toLowerCase();
 
-      final exis = existingRecords.firstWhere((e) => e['host'] == packageName,
+      var exis = existingRecords.firstWhere((e) => e['host'] == packageName,
           orElse: () => null);
+
 
       if (exis != null && exis['value'].split('+')[2] == hash) {
         print('skipping ${packageName}');
-        collection.write('''  - name: ${packageName}.$bridgeDomain
+        if (updatedRecently)
+          collection.write('''  - name: ${packageName}.$bridgeDomain
     verifiedMetadataHashes:
       [$hash]
 ''');
@@ -53,12 +88,14 @@ apps:
       }
 
       if (exis != null && exis['value'].split('+').length > 2) {
-        collection.write('''  - name: ${packageName}.$bridgeDomain
+        if (updatedRecently)
+          collection.write('''  - name: ${packageName}.$bridgeDomain
     verifiedMetadataHashes:
       [$hash,${exis['value'].split('+')[2]}]
 ''');
       } else {
-        collection.write('''  - name: ${packageName}.$bridgeDomain
+        if (updatedRecently)
+          collection.write('''  - name: ${packageName}.$bridgeDomain
     verifiedMetadataHashes:
       [$hash]
 ''');
@@ -66,17 +103,34 @@ apps:
 
       print('doing ${packageName}');
 
-      var res = await Process.run('curl', [
+      /*   var res = await Process.run('curl', [
         '-X',
         'POST',
         'https://siasky.net/skynet/skyfile',
         '-F',
         'file=@${file.path}'
       ]);
+ */
+
+      int skyTry = 0;
+
+      String skylink;
+      while (skylink == null) {
+        skyTry++;
+        print('try #$skyTry');
+        try {
+          skylink = await uploadFile(SkyFile(
+            content: file.readAsBytesSync(),
+            filename: basename(file.path),
+            type: 'application/x-yaml',
+          ));
+        } catch (e, st) {
+          print(e);
+          print(st);
+        }
+      }
 
       //print(res.stdout);
-
-      final skylink = json.decode(res.stdout)['skylink'];
 
       if (skylink != null) {
         records.add({
@@ -85,6 +139,11 @@ apps:
           'value': 'skydroid-app=1+$skylink+$hash',
           'ttl': 3600,
         });
+      }
+
+      if (records.length > 100) {
+        await setRecords();
+        records = [];
       }
 
       await Future.delayed(Duration(seconds: 1));
@@ -114,19 +173,14 @@ apps:
     'ttl': 3600,
   });
 
-  print(records);
+  final dnsRecordsBackupFile = File('data/dns-records.json');
+
+  dnsRecordsBackupFile.createSync(recursive: true);
+  dnsRecordsBackupFile.writeAsStringSync(json.encode(records));
+
 /*   return; */
 
-  var res = await http.put(
-    'https://www.namebase.io/api/v0/dns/domains/$bridgeDomain/nameserver',
-    headers: {'Authorization': authHeader, 'content-type': 'application/json'},
-    body: json.encode(
-      {
-        'records': records,
-        'deleteRecords': [],
-      },
-    ),
-  );
-  print(res.statusCode);
-  print(res.body);
+  await setRecords();
+
+  print('Total count: $i');
 }
